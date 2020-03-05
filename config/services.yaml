@@ -14,6 +14,7 @@ services:
             $imdbHost: '%env(IMDB_HOST)%'
             $imdbToken: '%env(IMDB_TOKEN)%'
             $serializer: '@jms_serializer.serializer'
+            $logger: '@monolog.logger.request'
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
     App\:
