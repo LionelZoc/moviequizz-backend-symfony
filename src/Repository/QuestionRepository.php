@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Question;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Common\Persistence\ManagerRegistry;
+use App\Utils\RedisHelper;
 
 /**
  * @method Question|null find($id, $lockMode = null, $lockVersion = null)
@@ -12,39 +13,35 @@ use Doctrine\Common\Persistence\ManagerRegistry;
  * @method Question[]    findAll()
  * @method Question[]    findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
  */
-class QuestionRepository extends ServiceEntityRepository
+class QuestionRepository
 {
-    public function __construct(ManagerRegistry $registry)
+    private $redisHelper;
+
+    public function __construct(RedisHelper $helper)
     {
-        parent::__construct($registry, Question::class);
+        $this->redisHelper = $helper;
     }
 
     // /**
-    //  * @return Question[] Returns an array of Question objects
+    //  * @return Game Returns a game object from key
     //  */
-    /*
-    public function findByExampleField($value)
-    {
-        return $this->createQueryBuilder('q')
-            ->andWhere('q.exampleField = :val')
-            ->setParameter('val', $value)
-            ->orderBy('q.id', 'ASC')
-            ->setMaxResults(10)
-            ->getQuery()
-            ->getResult()
-        ;
-    }
-    */
 
-    /*
-    public function findOneBySomeField($value): ?Question
+    public function findQuestionById($id)
     {
-        return $this->createQueryBuilder('q')
-            ->andWhere('q.exampleField = :val')
-            ->setParameter('val', $value)
-            ->getQuery()
-            ->getOneOrNullResult()
-        ;
+        if(empty($id) || !$this->redisHelper->exists('question'.$id)){
+            return null;
+        }
+        //create a repository for game that will return a game object
+        $data  = $this->redisHelper->get('question'.$id);
+        $question = new Question();
+        $question->setMoviePoster(isset($data['moviePoster'])? $data["moviePoster"] : 0);
+        $question->setMovieTitle(isset($data['movieTitle']));
+        $question->setActorName(isset($data['actorName']) ? $data['actorName'] : "");
+        $question->setActorPoster(isset($data['actorProfile']) ? $data['actorProfile'] : "" );
+        $question->setResponse(isset($data['response']) ? $data['response'] : "false");
+        $question->setId((int)$data['id']);
+
+        return $question;
     }
-    */
+
 }

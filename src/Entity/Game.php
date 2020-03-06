@@ -40,6 +40,11 @@ class Game
      */
     private $uid;
 
+    /**
+     * @ORM\Column(type="integer")
+     */
+    private $nextStep;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -83,6 +88,18 @@ class Game
     public function setUid(string $uid): self
     {
         $this->uid = $uid;
+
+        return $this;
+    }
+
+    public function getNextStep(): ?int
+    {
+        return $this->nextStep;
+    }
+
+    public function setNextStep(int $nextStep): self
+    {
+        $this->nextStep = $nextStep;
 
         return $this;
     }

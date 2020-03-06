@@ -37,11 +37,13 @@ class RedisHelper
 	}
 
 	//should move this to some manager class
-	public function saveGame(Game $game, $id){
+	public function saveGame(Game $game){
 
-		$this->redisHelper->set($id , "id", $game->getUid());
-    	$this->redisHelper->set($id , "score", $game->getScore());
-    	$this->redisHelper->set($id , "finished", $game->getFinished() ? 1 : 0);
+		$id = $game->getUid();
+		$this->set($id , "id", $game->getUid());
+    	$this->set($id , "score", $game->getScore());
+    	$this->set($id , "finished", $game->getFinished() ? "yes" : "no");
+			$this->set($id , "nextStep", $game->getNextStep());
 	}
 
 	public function saveQuestion(Question $question, $id){
@@ -50,7 +52,8 @@ class RedisHelper
     	$this->set($id , "moviePoster", $question->getMoviePoster());
     	$this->set($id , "movieTitle", $question->getMovieTitle());
     	$this->set($id , "actorName", $question->getActorName());
-    	$this->set($id , "actorTitle", $question->getActorPoster());
+    	$this->set($id , "actorProfile", $question->getActorPoster());
+			$this->set($id , "response", $question->getResponse());
 	}
 
 }

@@ -3,9 +3,14 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use JMS\Serializer\Annotation\ExclusionPolicy;
+use JMS\Serializer\Annotation\Groups;
+use JMS\Serializer\Annotation\Expose;
+use JMS\Serializer\Annotation\SerializedName;
 
 /**
  * @ORM\Entity(repositoryClass="App\Repository\QuestionRepository")
+ * @ExclusionPolicy("all")
  */
 class Question
 {
@@ -13,32 +18,37 @@ class Question
      * @ORM\Id()
      * @ORM\GeneratedValue()
      * @ORM\Column(type="integer")
+     * @Expose
      */
     private $id;
 
 
     /**
-     * @ORM\Column(type="boolean")
+     * @ORM\Column(type="string", length=255)
      */
     private $response;
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Expose
      */
     private $moviePoster;
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Expose
      */
     private $movieTitle;
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Expose
      */
     private $actorPoster;
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Expose
      */
     private $actorName;
 
@@ -56,14 +66,14 @@ class Question
 
 
 
-    public function getResponse(): ?bool
+    public function getResponse(): ?string
     {
         return $this->response;
     }
 
-    public function setResponse(bool $response): self
+    public function setResponse(string $response): self
     {
-        $this->response = $response;
+        $this->response = strcmp($response, "true") == 0 ? "true" : "false";
 
         return $this;
     }

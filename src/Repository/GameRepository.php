@@ -14,7 +14,7 @@ use App\Utils\RedisHelper;
  * @method Game[]    findAll()
  * @method Game[]    findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
  */
-class GameRepository 
+class GameRepository
 {
     private $redisHelper;
     public function __construct(RedisHelper $helper)
@@ -25,22 +25,24 @@ class GameRepository
     // /**
     //  * @return Game Returns a game object from key
     //  */
-    
+
     public function findGame($id)
     {
-        if(empty($id) || !$this->redisHelper->exists('game'.$id)){
+        if(empty($id) || !$this->redisHelper->exists($id)){
             return null;
         }
         //create a repository for game that will return a game object
-        $data  = $this->redisHelper->get('game'.$id);
+        $data  = $this->redisHelper->get($id);
+
         $game = new Game();
-        $game->setScore(isset($data['score'])? $data["score"] : 0);
-        $game->setUid(isset($data['id']));
-        $game->setFinished(isset($data['finished']) ? (bool) $data['finished'] : false);
+        $game->setScore(isset($data['score'])? (int)$data["score"] : 0);
+        $game->setUid($data['id']);
+        $game->setFinished(strcmp($data['finished'], "yes") == 0 ? true: false);
+        $game->setNextStep(isset($data['nextStep']) ? (int)$data['nextStep'] : 1);
 
         return $game;
     }
-    
+
 
     /*
     public function findOneBySomeField($value): ?Game

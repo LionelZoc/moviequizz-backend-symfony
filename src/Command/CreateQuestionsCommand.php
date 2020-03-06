@@ -31,9 +31,7 @@ class CreateQuestionsCommand extends Command
     protected function configure()
     {
         $this
-            ->setDescription('Add a short description for your command')
-            ->addArgument('arg1', InputArgument::OPTIONAL, 'Argument description')
-            ->addOption('option1', null, InputOption::VALUE_NONE, 'Option description')
+            ->setDescription('command that populate redis database with some questions')
         ;
     }
 
@@ -129,7 +127,7 @@ class CreateQuestionsCommand extends Command
     }
 
     /*
-    * create a question from a movie, and popular actors 
+    * create a question from a movie, and popular actors
     * you can also specify the index from which to start looking into the popular actor list
     * the function also take the $expectedAnswer to create a question with an expected response
     */
@@ -145,10 +143,10 @@ class CreateQuestionsCommand extends Command
         $question = new Question();
         $question->setMovieTitle($movie["title"]);
         $question->setMoviePoster($this->baseUrl.'original'.$movie["poster_path"]);
-        $question->setResponse($expectedAnswer);
+        $question->setResponse($expectedAnswer ? "true" : "false");
         $question->setId($questionIndex);
 
-        //take one popular person 
+        //take one popular person
 
         $castMember  = $this->getCastMember($movie, 1);
 
@@ -164,7 +162,7 @@ class CreateQuestionsCommand extends Command
                 if ($actorIndex >= $popularActorsSize ){
                     $actorIndex = 0;
                 }
-                
+
                 $actor = $popularActors[$actorIndex];
                 $actorIndex++;
             } while ($this->isActorInMovieCast($actor, $movie) == true);
@@ -179,9 +177,10 @@ class CreateQuestionsCommand extends Command
         return $question;
 
         //if yes set the response to the question to true, if not , set to false
-        //if i want the answer to be true, i just have to take one actor from the cast team 
+        //if i want the answer to be true, i just have to take one actor from the cast team
     }
 
+    //get imdb configuration for image absolute path configuration
     private function getConfiguration(){
 
         $configurationRoute = "/configuration";
@@ -190,7 +189,7 @@ class CreateQuestionsCommand extends Command
         $statusCode = $response->getStatusCode();
         $content = $response->getContent();
         $content = $response->toArray();
-        
+
         if ($statusCode == 200){
 
             $this->baseUrl = isset($content["images"]["secure_base_url"]) ? $content["images"]["secure_base_url"] : "https://image.tmdb.org/t/p/";
@@ -202,6 +201,7 @@ class CreateQuestionsCommand extends Command
         }
 
     }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
@@ -209,55 +209,35 @@ class CreateQuestionsCommand extends Command
         $this->getConfiguration();
 
         $discoverMovieRoute = "/discover/movie?sort_by=popularity.desc&page=1";
-        
+
         //fetch some popular movies
         $response = $this->httpClient->request('GET', $this->imdbHost.$discoverMovieRoute, ['auth_bearer' => $this->imdbToken]);
 
         $statusCode = $response->getStatusCode();
-        $io->note(sprintf('status code: %s', $statusCode));
 
         $content = $response->getContent();
         $content = $response->toArray();
+
         $questionIndex = 1;
         $expectedAnswer = true;
+
         if($statusCode == 200){
             $result = $content['results'];
 
             foreach ($result as $key => $movieData) {
 
                 $movie = $this->getMovideDetails($movieData['id']);
-                dump("created question for index");
-                dump($questionIndex);
-                dump($expectedAnswer);
+
                 $this->createQuestion($movie, $questionIndex, $expectedAnswer, $actorIndex = 0 );
                 $redisQuestion = $this->redisHelper->get('question'.$questionIndex);
-                dump($redisQuestion);
+
                 $questionIndex++;
                 $expectedAnswer = !$expectedAnswer;
-                $io->note(sprintf('created question for index: %s', $questionIndex, $expectedAnswer));
-                
-                
-                break;
             }
             $io->success(sprintf('You have created %d questions', $questionIndex - 1));
         }else{
             $io->error("unable to fetch some movies");
         }
-
-        ///dump($content);
-// $content = ['id' => 521583, 'name' => 'symfony-docs', ...]
-        /*
-        $arg1 = $input->getArgument('arg1');
-
-        if ($arg1) {
-            $io->note(sprintf('You passed an argument: %s', $arg1));
-        }
-
-        if ($input->getOption('option1')) {
-            // ...
-        }
-
-        $io->success('You have a new command! Now make it your own! Pass --help to see your options.');*/
 
         return 0;
     }
