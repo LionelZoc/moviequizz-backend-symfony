@@ -25,7 +25,7 @@ class GameController extends ResourceController
     	//create a repository for game that will return a game object
 
         $game = $repository->findGame($id);
-        
+
         if(!$game){
         	return $this->error("you provided a bad game id");
         }
@@ -46,7 +46,11 @@ class GameController extends ResourceController
         if ($game->getFinished()){
           return $this->error("this game is finished", 403);
         }
+        // $next = rand(1, 200);
+        // dump($next);
+      
         $question = $questionRepository->findQuestionById($game->getNextStep());
+
         return $this->success($question);
     }
 
@@ -74,7 +78,6 @@ class GameController extends ResourceController
         if(!$question){
           return $this->error("this question id does not exist");
         }
-
         if($content['response'] === $question->getResponse()){
           $game->setNextStep($step + 1);
           $game->setScore($game->getScore() + 1);
@@ -99,7 +102,10 @@ class GameController extends ResourceController
 	    	$game->setUid($id);
 	    	$game->setScore(0);
 	    	$game->setFinished(false);
-        $game->setNextStep(1);
+        //randomly set the starting point for the game
+        $next = rand(1, 5);
+
+        $game->setNextStep($next);
 
     		$this->redisHelper->saveGame($game);
 

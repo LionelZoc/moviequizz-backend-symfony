@@ -35,7 +35,7 @@ class QuestionRepository
         $data  = $this->redisHelper->get('question'.$id);
         $question = new Question();
         $question->setMoviePoster(isset($data['moviePoster'])? $data["moviePoster"] : 0);
-        $question->setMovieTitle(isset($data['movieTitle']));
+        $question->setMovieTitle(isset($data['movieTitle']) ? $data['movieTitle']: "no title" );
         $question->setActorName(isset($data['actorName']) ? $data['actorName'] : "");
         $question->setActorPoster(isset($data['actorProfile']) ? $data['actorProfile'] : "" );
         $question->setResponse(isset($data['response']) ? $data['response'] : "false");

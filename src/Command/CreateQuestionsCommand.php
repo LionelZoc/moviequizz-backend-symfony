@@ -46,16 +46,15 @@ class CreateQuestionsCommand extends Command
     }
 
     //get an actor that played in the movie, you can specify the index to choose a specific actor
-    private function getCastMember($movie, $index = 0){
+    private function getCastMember($movie){
 
         if (array_key_exists("credits", $movie) &&  array_key_exists("cast", $movie["credits"])){
 
                 $cast = $movie["credits"]["cast"];
                 $length = count($cast);
-                if ($index < $length){
-                    return $cast[$index];
-                }
-                return $cast[0];
+                $index = rand(1, $length-1);
+                return $cast[$index];
+
             }
     }
     //function that checks if an actor is in a movie
@@ -131,7 +130,7 @@ class CreateQuestionsCommand extends Command
     * you can also specify the index from which to start looking into the popular actor list
     * the function also take the $expectedAnswer to create a question with an expected response
     */
-    private function createQuestion($movie,$questionIndex=1, $expectedAnswer=true, $actorIndex = 0){
+    private function createQuestion($movie,$questionIndex=1, $expectedAnswer=true){
 
         $popularActors = $this->getPopularActors();
         $popularActorsSize = count($popularActors);
@@ -148,7 +147,7 @@ class CreateQuestionsCommand extends Command
 
         //take one popular person
 
-        $castMember  = $this->getCastMember($movie, 1);
+        $castMember  = $this->getCastMember($movie);
 
         if ($expectedAnswer == true){
             $question->setActorName($castMember['name']);
@@ -159,12 +158,13 @@ class CreateQuestionsCommand extends Command
             do {
                 # code...
                 //reset index if sup to actors array length
-                if ($actorIndex >= $popularActorsSize ){
-                    $actorIndex = 0;
-                }
-
+                // if ($actorIndex >= $popularActorsSize ){
+                //     $actorIndex = 0;
+                // }
+                //choose randomly a popular actor that is not in the movie cast
+                $actorIndex = rand(1, $popularActorsSize);
                 $actor = $popularActors[$actorIndex];
-                $actorIndex++;
+                //$actorIndex++;
             } while ($this->isActorInMovieCast($actor, $movie) == true);
 
             $question->setActorName($actor['name']);
@@ -181,14 +181,18 @@ class CreateQuestionsCommand extends Command
     }
 
     //get imdb configuration for image absolute path configuration
-    private function getConfiguration(){
+    private function getConfiguration($io){
 
         $configurationRoute = "/configuration";
 
+
         $response = $this->httpClient->request('GET', $this->imdbHost.$configurationRoute, ['auth_bearer' => $this->imdbToken]);
+
         $statusCode = $response->getStatusCode();
+
         $content = $response->getContent();
-        $content = $response->toArray();
+
+        $content = $content->toArray();
 
         if ($statusCode == 200){
 
@@ -200,16 +204,15 @@ class CreateQuestionsCommand extends Command
 
         }
 
+
     }
-
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $io = new SymfonyStyle($input, $output);
-        //get image path configuration
-        $this->getConfiguration();
-
-        $discoverMovieRoute = "/discover/movie?sort_by=popularity.desc&page=1";
-
+    //create a list of question
+    //$nbPage is the number of page to go through to get popular movies
+    private function batchCreateQuestion($nbPage=1, $io){
+      $questionIndex = 1;
+      for ($i=1; $i < $nbPage; $i++) {
+        $discoverMovieRoute = '/discover/movie?sort_by=popularity.desc&page='.$i;
+        $io->success(sprintf('ill fetch this route', $discoverMovieRoute));
         //fetch some popular movies
         $response = $this->httpClient->request('GET', $this->imdbHost.$discoverMovieRoute, ['auth_bearer' => $this->imdbToken]);
 
@@ -218,19 +221,27 @@ class CreateQuestionsCommand extends Command
         $content = $response->getContent();
         $content = $response->toArray();
 
-        $questionIndex = 1;
+
         $expectedAnswer = true;
 
         if($statusCode == 200){
             $result = $content['results'];
-
+            //create 3 quizz on each movie
             foreach ($result as $key => $movieData) {
 
                 $movie = $this->getMovideDetails($movieData['id']);
 
-                $this->createQuestion($movie, $questionIndex, $expectedAnswer, $actorIndex = 0 );
-                $redisQuestion = $this->redisHelper->get('question'.$questionIndex);
+                $this->createQuestion($movie, $questionIndex, $expectedAnswer );
+                //$redisQuestion = $this->redisHelper->get('question'.$questionIndex);
 
+                $questionIndex++;
+                $expectedAnswer = !$expectedAnswer;
+
+                $this->createQuestion($movie, $questionIndex, $expectedAnswer );
+                $questionIndex++;
+                $expectedAnswer = !$expectedAnswer;
+
+                $this->createQuestion($movie, $questionIndex, $expectedAnswer );
                 $questionIndex++;
                 $expectedAnswer = !$expectedAnswer;
             }
@@ -238,6 +249,17 @@ class CreateQuestionsCommand extends Command
         }else{
             $io->error("unable to fetch some movies");
         }
+      }
+
+    }
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $io = new SymfonyStyle($input, $output);
+        //get image path configuration
+
+        $this->getConfiguration($io);
+        //create some questions
+        $this->batchCreateQuestion(10, $io);
 
         return 0;
     }
