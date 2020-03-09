@@ -36,10 +36,10 @@ class Movie
         return $this->id;
     }
 
-    public function setId(integer $id): self
+    public function setId(int $id): self
     {
          $this->id = $id;
-         
+
          return $this;
     }
 
