@@ -1,29 +1,27 @@
-# README #
+#set up .env.local
 
-This README would normally document whatever steps are necessary to get your application up and running.
+create a .env.local file in which you will pour you env variable.
 
-### What is this repository for? ###
+for a quick start you can put those values in it:
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+REDIS_URL=redis://localhost
+APP_ENV=dev
+IMDB_TOKEN=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhMmY3ZGUxYTRkYTQzOTNhNjcyMWQwNDVhMWZmOWU2MyIsInN1YiI6IjVlNWVkMmEzODdlNjNlMDAxNTc2MWVlMyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.2zKfQwiO7m0kk9r2qt8gAMszNWelvfa4r5ZX7sroL54
+IMDB_HOST="https://api.themoviedb.org/3"
 
-### How do I get set up? ###
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+#install packages
 
-### Contribution guidelines ###
+composer install
 
-* Writing tests
-* Code review
-* Other guidelines
+#populate redis with questions ! Mandatory
 
-### Who do I talk to? ###
+create some questions with: php bin/console app:create:questions
 
-* Repo owner or admin
-* Other community or team contact
+#endpoints exposed
+
+create game with: POST api/games
+get game with : GET api/games/{id}
+
+get random question : GET api/games/{game_id}/play
+send response to question : POST api/{game_id}/play //body: {response:"true",question:1}
