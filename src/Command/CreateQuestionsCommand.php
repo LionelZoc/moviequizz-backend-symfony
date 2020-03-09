@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\HttpClient\HttpClient;
-use JMS\Serializer\SerializationContext;
+
 
 use App\Entity\Movie;
 use App\Entity\Actor;
@@ -23,7 +23,7 @@ class CreateQuestionsCommand extends Command
     private $imdbToken;
     private $imdbHost;
     private $redisHelper;
-    private $serializer;
+
     private $httpClient;
     private $popularActors= null;
     private $baseUrl;
@@ -35,13 +35,12 @@ class CreateQuestionsCommand extends Command
         ;
     }
 
-    public function __construct($imdbToken, $imdbHost, RedisHelper $helper, $serializer) {
+    public function __construct($imdbToken, $imdbHost, RedisHelper $helper) {
 
         parent::__construct();
         $this->imdbHost = $imdbHost;
         $this->imdbToken = $imdbToken;
         $this->redisHelper = $helper;
-        $this->serializer = $serializer;
         $this->httpClient = HttpClient::create();
     }
 
@@ -52,7 +51,11 @@ class CreateQuestionsCommand extends Command
 
                 $cast = $movie["credits"]["cast"];
                 $length = count($cast);
-                $index = rand(1, $length-1);
+                if ($length < 1){
+                    throw new \Exception("Movie with no cast member");
+                    
+                }
+                $index = rand(0, $length-1);
                 return $cast[$index];
 
             }
@@ -85,13 +88,13 @@ class CreateQuestionsCommand extends Command
     private function getPopularActors(){
 
         if(!empty($this->popularActors)) return $this->popularActors;
+
         $popularActorRoute = '/person/popular';
         $response = $this->httpClient->request('GET', $this->imdbHost.$popularActorRoute, ['auth_bearer' => $this->imdbToken]);
         $statusCode = $response->getStatusCode();
 
         if($statusCode == 200){
 
-            $content = $response->getContent();
             $content = $response->toArray();
             $actors =  $content['results'];
             $this->popularActors = $actors;
@@ -117,7 +120,7 @@ class CreateQuestionsCommand extends Command
         $statusCode = $response->getStatusCode();
         if ($statusCode == 200){
 
-            $content = $response->getContent();
+
             $content = $response->toArray();
             //dump($content["credits"]);
             return $content;
@@ -130,58 +133,60 @@ class CreateQuestionsCommand extends Command
     * you can also specify the index from which to start looking into the popular actor list
     * the function also take the $expectedAnswer to create a question with an expected response
     */
-    private function createQuestion($movie,$questionIndex=1, $expectedAnswer=true){
+    private function createQuestion($movie,$questionIndex=1, $expectedAnswer=true, SymfonyStyle $io){
+        try {
 
-        $popularActors = $this->getPopularActors();
-        $popularActorsSize = count($popularActors);
-        if (!$popularActors){
-            //should not happen
+            $popularActors = $this->getPopularActors();
+            $popularActorsSize = count($popularActors);
+            if (!$popularActors){
+                //should not happen
+                return null;
+            }
+
+            $question = new Question();
+            $question->setMovieTitle($movie["title"]);
+            $question->setMoviePoster($this->baseUrl.'original'.$movie["poster_path"]);
+            $question->setResponse($expectedAnswer ? "true" : "false");
+            $question->setId($questionIndex);
+
+            //take one popular person
+
+            $castMember  = $this->getCastMember($movie);
+
+            if ($expectedAnswer == true){
+                $question->setActorName($castMember['name']);
+                $question->setActorPoster($this->baseUrl.'original'.$castMember['profile_path']);
+
+            }else{
+                //find a popular actor that is not in the movie cast
+                do {
+
+                    //choose randomly a popular actor that is not in the movie cast
+                    $actorIndex = rand(1, $popularActorsSize-1);
+                    $actor = $popularActors[$actorIndex];
+                    //$actorIndex++;
+                } while ($this->isActorInMovieCast($actor, $movie) == true);
+
+                $question->setActorName($actor['name']);
+                $question->setActorPoster($this->baseUrl.'original'.$actor['profile_path']);
+            }
+
+            //save question to redis
+            //chose id
+            $this->redisHelper->saveQuestion($question, "question".$questionIndex);
+            return $question;
+            
+        } catch (\Exception $e) {
+
+            $io->error($e->getMessage());
             return null;
         }
 
-        $question = new Question();
-        $question->setMovieTitle($movie["title"]);
-        $question->setMoviePoster($this->baseUrl.'original'.$movie["poster_path"]);
-        $question->setResponse($expectedAnswer ? "true" : "false");
-        $question->setId($questionIndex);
 
-        //take one popular person
-
-        $castMember  = $this->getCastMember($movie);
-
-        if ($expectedAnswer == true){
-            $question->setActorName($castMember['name']);
-            $question->setActorPoster($this->baseUrl.'original'.$castMember['profile_path']);
-
-        }else{
-
-            do {
-                # code...
-                //reset index if sup to actors array length
-                // if ($actorIndex >= $popularActorsSize ){
-                //     $actorIndex = 0;
-                // }
-                //choose randomly a popular actor that is not in the movie cast
-                $actorIndex = rand(1, $popularActorsSize);
-                $actor = $popularActors[$actorIndex];
-                //$actorIndex++;
-            } while ($this->isActorInMovieCast($actor, $movie) == true);
-
-            $question->setActorName($actor['name']);
-            $question->setActorPoster($this->baseUrl.'original'.$actor['profile_path']);
-        }
-
-        //save question to redis
-        //chose id
-        $this->redisHelper->saveQuestion($question, "question".$questionIndex);
-        return $question;
-
-        //if yes set the response to the question to true, if not , set to false
-        //if i want the answer to be true, i just have to take one actor from the cast team
     }
 
     //get imdb configuration for image absolute path configuration
-    private function getConfiguration($io){
+    private function getConfiguration(){
 
         $configurationRoute = "/configuration";
 
@@ -190,9 +195,7 @@ class CreateQuestionsCommand extends Command
 
         $statusCode = $response->getStatusCode();
 
-        $content = $response->getContent();
-
-        $content = $content->toArray();
+        $content = $response->toArray();
 
         if ($statusCode == 200){
 
@@ -206,19 +209,22 @@ class CreateQuestionsCommand extends Command
 
 
     }
+
     //create a list of question
     //$nbPage is the number of page to go through to get popular movies
-    private function batchCreateQuestion($nbPage=1, $io){
+    private function batchCreateQuestion($nbPage=1, SymfonyStyle $io){
+
+
       $questionIndex = 1;
+
       for ($i=1; $i < $nbPage; $i++) {
         $discoverMovieRoute = '/discover/movie?sort_by=popularity.desc&page='.$i;
-        $io->success(sprintf('ill fetch this route', $discoverMovieRoute));
+        
         //fetch some popular movies
         $response = $this->httpClient->request('GET', $this->imdbHost.$discoverMovieRoute, ['auth_bearer' => $this->imdbToken]);
 
         $statusCode = $response->getStatusCode();
 
-        $content = $response->getContent();
         $content = $response->toArray();
 
 
@@ -231,19 +237,15 @@ class CreateQuestionsCommand extends Command
 
                 $movie = $this->getMovideDetails($movieData['id']);
 
-                $this->createQuestion($movie, $questionIndex, $expectedAnswer );
+                //create a question so that the anwser will be expectedAnswer
+                $createdQuestion = $this->createQuestion($movie, $questionIndex, $expectedAnswer, $io);
                 //$redisQuestion = $this->redisHelper->get('question'.$questionIndex);
+                if ($createdQuestion){
+                    $questionIndex++;
+                    $expectedAnswer = !$expectedAnswer;
+                }
+                
 
-                $questionIndex++;
-                $expectedAnswer = !$expectedAnswer;
-
-                $this->createQuestion($movie, $questionIndex, $expectedAnswer );
-                $questionIndex++;
-                $expectedAnswer = !$expectedAnswer;
-
-                $this->createQuestion($movie, $questionIndex, $expectedAnswer );
-                $questionIndex++;
-                $expectedAnswer = !$expectedAnswer;
             }
             $io->success(sprintf('You have created %d questions', $questionIndex - 1));
         }else{
@@ -255,11 +257,13 @@ class CreateQuestionsCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+        //number of page to go through when fetching popular movies
+        $maxPage = 20;
         //get image path configuration
-
         $this->getConfiguration($io);
-        //create some questions
-        $this->batchCreateQuestion(10, $io);
+
+        //create some questions 
+        $this->batchCreateQuestion($maxPage, $io);
 
         return 0;
     }
