@@ -16,6 +16,7 @@ composer install
 
 #populate redis with questions ! Mandatory
 
+- lunch redis server before executing command
 create some questions with: php bin/console app:create:questions
 
 #endpoints exposed
